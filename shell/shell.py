@@ -49,7 +49,7 @@ def exec_command(input):
     sys.exit(1)  # terminate with error
 
 
-def pipe(input):
+def pipe(input_arr):
     # grabs everything to the right of |, this splits at ('|')
     read_comm = input_arr[input_arr.index('|')+1:]
     # grabs everything to the left of |, this splits 0 to ('|')
@@ -97,7 +97,7 @@ while True:
     os.write(1, p.encode())
     # gets the users input
     try:
-        # .split() removes any leading or trailing empty spaces
+        # .strip() removes any leading or trailing empty spaces
         user_input = input().strip()
         # will split users input into an array
         input_arr = user_input.split()
