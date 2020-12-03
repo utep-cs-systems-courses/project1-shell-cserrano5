@@ -14,7 +14,6 @@ def change_directory(input_arr):
     try:
         os.chdir(input_arr[1])
     except FileNotFoundError:
-        # os.write(1, ("cd: %s: No such file or directory exists\n" % input_arr[1]).encode())
         pass
 
 
@@ -50,6 +49,47 @@ def exec_command(input):
     sys.exit(1)  # terminate with error
 
 
+def pipe(input):
+    # grabs everything to the right of |, this splits at ('|')
+    read_comm = input_arr[input_arr.index('|')+1:]
+    # grabs everything to the left of |, this splits 0 to ('|')
+    write_comm = input_arr[0:input_arr.index('|')]
+    # creates file descriptor
+    pr, pw = os.pipe()   # pipe read(output) and write(input)
+    for f in (pr, pw):
+        # ensure that f is inheritable
+        os.set_inheritable(f, True)
+
+    # fork for pipe command, ready to fork; creates child process; clones current process
+    rc = os.fork()
+    if rc < 0:
+        os.write(2, 'Fork failed.'.encode())
+        sys.exit(1)  # terminate with error
+    elif rc == 0:
+        # closes fd 1
+        os.close(1)
+        # duplicates input file descriptor
+        os.dup(pw)
+        # ensure fd 1 is inheritable
+        os.set_inheritable(1, True)
+
+        for fd in (pr, pw):
+            os.close(fd)  # closes both pr and pw (inputfd and outputfd)
+        exec_command(write_comm)  # executes first command
+        sys.exit(1)  # terminate with error
+    else:
+        # closes fd 0
+        os.close(0)
+        # duplicates output file descriptor
+        os.dup(pr)
+        # ensures fd 0 is inheritable
+        os.set_inheritable(0, True)
+
+        for fd in (pw, pr):
+            os.close(fd) # closes file descriptors
+        exec_command(read_comm)  # executes second command
+
+
 # shell
 while True:
     # prompts user with $ to indicate they're in the shell and prints path
@@ -58,9 +98,9 @@ while True:
     # gets the users input
     try:
         # .split() removes any leading or trailing empty spaces
-        user_input_str = input().strip()
+        user_input = input().strip()
         # will split users input into an array
-        input_arr = user_input_str.split()
+        input_arr = user_input.split()
     except EOFError:
         sys.exit(1)  # terminate with error
 
@@ -74,7 +114,7 @@ while True:
 
     elif '|' in input_arr:
         # uses pipe command
-        #pipe(input_arr) need to creat pipe function
+        pipe(input_arr)
 
     else:
         rc = os.fork()
