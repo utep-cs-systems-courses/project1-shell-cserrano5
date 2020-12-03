@@ -1,210 +1,99 @@
+
+
 # Crystal Serrano
 # Lab 1
 # Collaborated with classmates through online meetings
 #
 
-
+#! usr/bin/env python3
 
 import os, sys, re
 
-def fork(args):
-
-    pid = os.getpid()  # gets and remembers the pid number
-    rc = os.fork()  # set rc to fork
-
-    if rc < 0:  # capture error during fork
-        os.write(2, ("fork failed, returning %d\n" % rc).encode())
-        sys.exit(1)
-
-    elif rc == 0:  # child
-
-        fd = sys.stdout.fileno()  # this sets the file descriptor
-        os.set_inheritable(fd, True)
-
-        try:
-            os.execve(args[0], args, os.environ)  # this will execute program
-        except FileNotFoundError:
-            pass
-        if "/" in args:
-            os.execve(args[0], args, os.environ)
-
-        for dir in re.split(":", os.environ['PATH']):  # this will check for environment variables
-            program = "%s/%s" % (dir, args[0])
-            try:
-                os.execve(program, args, os.environ)
-            except FileNotFoundError:
-                pass
-
-        os.write(2, ("%s: command not found\n" % args[0]).encode())  # if command not found print error
-        sys.exit(1)
-
-    else:
-        childPid = os.wait()  # wait for child to fork
-
-
-def redirectOut(args):
-    fileIndex = args.index('>') + 1  # check for index of ouput '>'
-    fileName = args[fileIndex]  # array index from user input
-
-    args = args[:fileIndex - 1]
-
-    pid = os.getpid()  # get pid
-
-    rc = os.fork()  # ready to fork
-
-    if rc < 0:
-        os.write(2, ("fork failed, returning %d\n" % rc).encode())
-        sys.exit(1)
-
-    elif rc == 0:
-        os.close(1)
-        sys.stdout = open(fileName, "w")  # open and write to output
-        os.set_inheritable(1, True)
-
-        if os.path.isfile(args[0]):
-            try:
-                os.execve(args[0], args, os.environ)
-            except FileNotFoundError:
-                pass
-            else:
-                for dir in re.split(":", os.environ['PATH']):  # check for environment variables
-                    program = "%s/%s" % (dir, args[0])
-                    try:
-                        os.execve(args[0], args, os.environ)
-                    except FileNotFoundError:
-                        pass
-
-                os.write(2, ("%s: command not found\n" % args[0]).encode())
-                sys.exit(1)
-    else:
-        childPid = os.wait()
-
-
-def redirectIn(args):
-    pid = os.getpid()  # get pid
-
-    rc = os.fork()  # ready to fork
-
-    if rc < 0:  # return error message if fork fails
-        os.write(2, ("fork failed, returning %d\n" % rc).encode())
-        sys.exit(1)
-
-    elif rc == 0:
-        del args[1]
-        fd = sys.stdout.fileno()  # set file descriptor output
-
-        try:
-            os.execve(args[0], args, os.environ)  # execute program
-        except FileNotFoundError:
-            pass
-        for dir in re.split(":", os.environ['PATH']):  # check for environment variables
-            program = "%s/%s" % (dir, args[0])
-            try:
-                os.execve(program, args, os.environ)
-            except FileNotFoundError:
-                pass
-        os.write(2, ("%s: command not found\n" % args[0]).encode())  # if the command was not found return error
-        sys.exit(1)
-
-    else:
-        childPid = os.wait()
-
-
-def pipe(args):
-    pid = os.getpid()  # get pid
-
-    pipe = args.index("|")  # check for pipe in command
-
-    pr, pw = os.pipe()  # pipe read(input) pipe write(output)
-    for f in (pr, pw):
-        os.set_inheritable(f, True)
-
-    rc = os.fork()  # ready to fork
-
-    if rc < 0:
-        print("fork failed, returning %d\n" % rc, file = sys.stderr)
-        sys.exit(1)
-
-    elif rc == 0:  # write to pipe from child
-        args = args[:pipe]
-
-        os.close(1)
-
-        fd = os.dup(pw)  # duplicate file descriptor output
-        os.set_inheritable(fd, True)
-        for fd in (pr, pw):
-            os.close(fd)
-        if os.path.isfile(args[0]):
-            try:
-                os.execve(args[0], args, os.environ)  # try to execute program
-            except FileNotFoundError:
-                pass
-        else:
-            for dir in re.split(":", os.environ['PATH']):  # Check for environment variables
-                program = "%s/%s" % (dir, args[0])
-                try:
-                    os.execve(program, args, os.environ)  # try to execute program
-                except FileNotFoundError:
-                    pass
-
-        os.write(2, ("%s: command not found\n" % args[0]).encode())
-
-        sys.exit(1)
-
-    else:
-        args = args[pipe + 1:]
-
-        os.close(0)
-
-        fd = os.dup(pr)  # duplicate file descriptor for output
-        os.set_inheritable(fd, True)
-        for fd in (pw, pr):
-            os.close(fd)  # close file descriptor
-
-        if os.path.isfile(args[0]):
-            try:
-                os.execve(args[0], args, os.environ)  # execute program
-            except FileNotFoundError:
-                pass
-        else:
-            for dir in re.split(":", os.environ['PATH']):  # Check for environment variables
-                program = "%s/%s" % (dir, args[0])
-                try:
-                    os.execve(program, args, os.environ)  # execute program
-                except FileNotFoundError:
-                    pass
-
-        os.write(2, ("%s: command not found\n" % args[0]).encode())  # return error if command was not found
-
-        sys.exit(1)
-
-while True:
-    print("$", end=" ")
-    if 'PS1' in os.environ:  # check and add prompt string to shell
-        os.write(1, os.environ['PS1'].encode())
+# function receives array and executes ls command to change directory, cd and cd .. work
+def change_directory(input_arr):
     try:
-        userInput = input()  # Get user input
+        os.chdir(input_arr[1])
+    except FileNotFoundError:
+        # os.write(1, ("cd: %s: No such file or directory exists\n" % input_arr[1]).encode())
+        pass
+
+
+# function receives array to operate redirections > and < (output & input)
+def redirect(redirect_arr):
+    # redirect output
+    if '>' in redirect_arr:
+        os.close(1)  # closes file descriptor 1, redirects child's stdout
+        # open output file for writing
+        # if file doesnt exist, create flag will create file, if it does exist, then it'll be written in to
+        os.open(redirect_arr[redirect_arr.index('>')+1], os.O_CREAT | os.O_WRONLY)  # create and write only flags
+        # file descriptor flag is to be set to ensure fd 1 is inheritable
+        os.set_inheritable(1, True)
+        exec_command(redirect_arr[0:redirect_arr.index('>')])
+    else:
+        # redirect input
+        os.close(0)  # closes file descriptor 0, disconnect keyboard
+        # open input file for reading
+        os.open(redirect_arr[redirect_arr.index('<'+1), os.O_RDONLY])
+        os.set_inheritable(0, True)  # ensure fd 0 is inheritable
+        exec_command(redirect_arr[0:redirect_arr('<')])
+
+
+# function receives array and executes the command
+def exec_command(input):
+    for dir in re.split(":", os.environ['PATH']): # tries each directory in path
+        program = "%s/%s" % (dir, input[0])
+        try:
+            os.execve(program, input, os.environ) # try to exec program
+        except FileNotFoundError:
+            pass  # fail quietly
+    os.write(2, ("Command: '%s' not found." % input[0]).encode())
+    sys.exit(1)  # terminate with error
+
+
+# shell
+while True:
+    # prompts user with $ to indicate they're in the shell and prints path
+    p = os.getcwd() + ' $' if 'PS1' not in os.environ else os.environ['PS1']
+    os.write(1, p.encode())
+    # gets the users input
+    try:
+        # .split() removes any leading or trailing empty spaces
+        user_input_str = input().strip()
+        # will split users input into an array
+        input_arr = user_input_str.split()
     except EOFError:
-        sys.exit(1)
-    except ValueError:
-        sys.exit(1)
+        sys.exit(1)  # terminate with error
 
-    args = userInput.split()  # Split user input into array
-
-    if "exit" in userInput:  # Exit command
+    if "exit" in input_arr:
+        # exits the shell
         sys.exit(0)
 
-    if "cd" in args[0]:  # Change directories
-        try:
-            os.chdir(args[1])  # change directory
-        except FileNotFoundError:
-            os.write(1, ("cd: %s: No such file or directory\n" % args[1]).encode())
-            pass
+    if "cd" in input_arr[0]:
+        # changes directory command: ls, cd, cd ..
+        change_directory(input_arr)
 
-    elif "|" in userInput:  # Handle pipe
-        pipe(args)
-    elif "<" in userInput:  # Handle redirection input
-        redirectIn(args)
+    elif '|' in input_arr:
+        # uses pipe command
+        #pipe(input_arr) need to creat pipe function
+
     else:
-        fork(args)  # Handle commands
-
+        rc = os.fork()
+        if rc < 0:
+            os.write(2, ('Fork failed.\n' % rc).encode())
+            sys.exit(1)  # terminate with error
+        elif rc == 0:
+            if '/' in input_arr[0]:
+                try:
+                    os.execve(input_arr[0], input_arr, os.environ)   # tries to execute program
+                except FileNotFoundError:
+                    pass
+            # redirection
+            elif '>' in input_arr or '<' in input_arr:
+                redirect(input_arr)
+            else:
+                for dir in re.split(":", os.environ['PATH']):
+                    program = "%s/%s" % (dir, input_arr[0])
+                    try:
+                        os.execve(program, input_arr, os.environ)
+                    except FileNotFoundError:
+                        pass
